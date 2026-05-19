@@ -1,0 +1,322 @@
+from rest_framework import status, generics, viewsets
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from rest_framework.permissions import AllowAny, IsAuthenticated, BasePermission
+from django.contrib.auth import authenticate
+from rest_framework_simplejwt.tokens import RefreshToken
+from django.core.mail import send_mail
+from django.conf import settings
+from django.contrib.auth.hashers import make_password
+import random
+from .serializers import (
+    UserSerializer, LoginSerializer, TeacherSerializer, 
+    EducationSerializer, CourseSerializer, CourseTeacherSerializer,
+    CompletedCourseSerializer, ResearchInterestSerializer,
+    CommentSerializer, RatingSerializer, EventSerializer,
+    StudentRegistrationSerializer, OTPVerificationSerializer,
+    HomepageHeroSerializer, AboutUsHeroSerializer, CampusLifeHeroSerializer,
+    EventsHeroSerializer, CampusGallerySerializer
+)
+from .models import (
+    User, Teacher, Education, Course, CourseTeacher, 
+    CompletedCourse, ResearchInterest, Comment, Rating, Event,
+    OTPVerification,
+    HomepageHero, AboutUsHero, CampusLifeHero, EventsHero, CampusGallery
+)
+
+class IsAdminOrReadOnly(BasePermission):
+    def has_permission(self, request, view):
+        if request.method in ['GET', 'HEAD', 'OPTIONS']:
+            return True
+        return bool(request.user and request.user.is_authenticated and request.user.role == 'admin')
+
+class IsAdminTeacherOrReadOnly(BasePermission):
+    def has_permission(self, request, view):
+        if request.method in ['GET', 'HEAD', 'OPTIONS']:
+            return True
+        return bool(request.user and request.user.is_authenticated and (request.user.role in ['teacher', 'admin']))
+
+class IsTeacherOrAdmin(BasePermission):
+    def has_permission(self, request, view):
+        return bool(
+            request.user and 
+            request.user.is_authenticated and 
+            (request.user.role in ['teacher', 'admin'] or request.user.is_staff)
+        )
+
+class StudentRegistrationView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            serializer = StudentRegistrationSerializer(data=request.data)
+            if serializer.is_valid():
+                email = serializer.validated_data['email']
+                password = serializer.validated_data['password']
+                
+                if User.objects.filter(email=email).exists():
+                    return Response({
+                        'error': 'User already exists with this email address.'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+
+                otp = str(random.randint(100000, 999999))
+                hashed_password = make_password(password)
+                
+                OTPVerification.objects.update_or_create(
+                    email=email,
+                    defaults={'otp': otp, 'password': hashed_password}
+                )
+                
+                send_mail(
+                    'Verify your email - TeacherBackend',
+                    f'Your OTP for registration is: {otp}',
+                    settings.DEFAULT_FROM_EMAIL,
+                    [email],
+                    fail_silently=False,
+                )
+                
+                return Response({
+                    'message': 'OTP sent to your email. Please verify to complete registration.'
+                }, status=status.HTTP_200_OK)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({
+                'error': 'Internal Error'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class VerifyOTPView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            serializer = OTPVerificationSerializer(data=request.data)
+            if serializer.is_valid():
+                email = serializer.validated_data['email']
+                otp = serializer.validated_data['otp']
+                
+                try:
+                    otp_record = OTPVerification.objects.get(email=email, otp=otp)
+                    base_username = email.split('@')[0]
+                    username = base_username
+                    counter = 1
+                    while User.objects.filter(username=username).exists():
+                        username = f"{base_username}{counter}"
+                        counter += 1
+
+                    user = User.objects.create(
+                        email=email,
+                        username=username,
+                        password=otp_record.password,
+                        role=serializer.validated_data.get('role', 'student')
+                    )
+                    otp_record.delete()
+                    
+                    refresh = RefreshToken.for_user(user)
+                    return Response({
+                        'message': 'User registered successfully.',
+                        'refresh': str(refresh),
+                        'access': str(refresh.access_token),
+                        'user': UserSerializer(user).data
+                    }, status=status.HTTP_201_CREATED)
+                except OTPVerification.DoesNotExist:
+                    return Response({'error': 'Invalid OTP or email'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({
+                'error': 'Internal Error'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class LoginView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            serializer = LoginSerializer(data=request.data)
+            if serializer.is_valid():
+                email = serializer.validated_data['email']
+                password = serializer.validated_data['password']
+                user = authenticate(username=email, password=password)
+
+                if user:
+                    refresh = RefreshToken.for_user(user)
+                    teacher_data = None
+                    if user.role == 'teacher':
+                        try:
+                            teacher = user.teacher_profile
+                            teacher_data = TeacherSerializer(teacher).data
+                        except Teacher.DoesNotExist:
+                            teacher_data = None
+
+                    return Response({
+                        'refresh': str(refresh),
+                        'access': str(refresh.access_token),
+                        'user': UserSerializer(user).data,
+                        'teacher_profile': teacher_data
+                    }, status=status.HTTP_200_OK)
+                return Response({'error': 'Invalid Credentials'}, status=status.HTTP_401_UNAUTHORIZED)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({
+                'error': 'Internal Error'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class RegisterView(generics.CreateAPIView):
+    queryset = User.objects.all()
+    permission_classes = [AllowAny]
+    serializer_class = UserSerializer
+
+class UserProfileView(generics.RetrieveUpdateAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = UserSerializer
+
+    def get_object(self):
+        return self.request.user
+
+class UserViewSet(viewsets.ModelViewSet):
+    queryset = User.objects.all()
+    serializer_class = UserSerializer
+    permission_classes = [IsAuthenticated]
+
+class TeacherViewSet(viewsets.ModelViewSet):
+    queryset = Teacher.objects.all()
+    serializer_class = TeacherSerializer
+    permission_classes = [IsAdminTeacherOrReadOnly]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        department = self.request.query_params.get('department')
+        search = self.request.query_params.get('search')
+        
+        if department and department != 'All Professors':
+            queryset = queryset.filter(department=department)
+        
+        if search:
+            from django.db.models import Q
+            queryset = queryset.filter(
+                Q(first_name__icontains=search) | 
+                Q(last_name__icontains=search) |
+                Q(department__icontains=search) |
+                Q(biography__icontains=search)
+            )
+        return queryset.order_by('id')
+
+class EducationViewSet(viewsets.ModelViewSet):
+    queryset = Education.objects.all()
+    serializer_class = EducationSerializer
+    permission_classes = [IsTeacherOrAdmin]
+
+class CourseViewSet(viewsets.ModelViewSet):
+    queryset = Course.objects.all()
+    serializer_class = CourseSerializer
+    permission_classes = [IsAdminTeacherOrReadOnly]
+
+class CourseTeacherViewSet(viewsets.ModelViewSet):
+    queryset = CourseTeacher.objects.all()
+    serializer_class = CourseTeacherSerializer
+    permission_classes = [IsAdminTeacherOrReadOnly]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        teacher_id = self.request.query_params.get('teacher_id')
+        course_id = self.request.query_params.get('course')
+        is_current = self.request.query_params.get('is_current')
+        
+        if teacher_id:
+            queryset = queryset.filter(teacher_id=teacher_id)
+        if course_id:
+            queryset = queryset.filter(course_id=course_id)
+        if is_current:
+            queryset = queryset.filter(is_current=is_current.lower() == 'true')
+        return queryset
+
+class CompletedCourseViewSet(viewsets.ModelViewSet):
+    queryset = CompletedCourse.objects.all()
+    serializer_class = CompletedCourseSerializer
+    permission_classes = [IsAdminTeacherOrReadOnly]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        teacher_id = self.request.query_params.get('teacher_id')
+        course_id = self.request.query_params.get('course')
+        if teacher_id:
+            queryset = queryset.filter(teacher_id=teacher_id)
+        if course_id:
+            queryset = queryset.filter(course_id=course_id)
+        return queryset
+
+class ResearchInterestViewSet(viewsets.ModelViewSet):
+    queryset = ResearchInterest.objects.all()
+    serializer_class = ResearchInterestSerializer
+    permission_classes = [IsTeacherOrAdmin]
+
+class CommentViewSet(viewsets.ModelViewSet):
+    queryset = Comment.objects.all()
+    serializer_class = CommentSerializer
+    permission_classes = [IsAuthenticated]
+
+class RatingViewSet(viewsets.ModelViewSet):
+    queryset = Rating.objects.all()
+    serializer_class = RatingSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        teacher_id = self.request.query_params.get('teacher_id')
+        if teacher_id:
+            queryset = queryset.filter(teacher_id=teacher_id)
+        return queryset
+
+class EventViewSet(viewsets.ModelViewSet):
+    queryset = Event.objects.all().order_by('-start_date')
+    serializer_class = EventSerializer
+    permission_classes = [IsAdminTeacherOrReadOnly]
+
+    def create(self, request, *args, **kwargs):
+        print("====== INCOMING EVENT POST DATA ======")
+        print(request.data)
+        print("=======================================")
+        return super().create(request, *args, **kwargs)
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        search = self.request.query_params.get('search')
+        organizer_id = self.request.query_params.get('organizer_id')
+        
+        if search:
+            from django.db.models import Q
+            queryset = queryset.filter(
+                Q(title__icontains=search) | 
+                Q(description__icontains=search) |
+                Q(event_type__icontains=search) |
+                Q(location__icontains=search)
+            )
+            
+        if organizer_id:
+            queryset = queryset.filter(organizer_id=organizer_id)
+            
+        return queryset
+
+class HomepageHeroViewSet(viewsets.ModelViewSet):
+    queryset = HomepageHero.objects.all()
+    serializer_class = HomepageHeroSerializer
+    permission_classes = [IsAdminOrReadOnly]
+
+class AboutUsHeroViewSet(viewsets.ModelViewSet):
+    queryset = AboutUsHero.objects.all()
+    serializer_class = AboutUsHeroSerializer
+    permission_classes = [IsAdminOrReadOnly]
+
+class CampusLifeHeroViewSet(viewsets.ModelViewSet):
+    queryset = CampusLifeHero.objects.all()
+    serializer_class = CampusLifeHeroSerializer
+    permission_classes = [IsAdminOrReadOnly]
+
+class EventsHeroViewSet(viewsets.ModelViewSet):
+    queryset = EventsHero.objects.all()
+    serializer_class = EventsHeroSerializer
+    permission_classes = [IsAdminOrReadOnly]
+
+class CampusGalleryViewSet(viewsets.ModelViewSet):
+    queryset = CampusGallery.objects.all()
+    serializer_class = CampusGallerySerializer
+    permission_classes = [IsAdminOrReadOnly]
