@@ -210,8 +210,25 @@ class CourseViewSet(viewsets.ModelViewSet):
     serializer_class = CourseSerializer
     permission_classes = [IsAdminTeacherOrReadOnly]
 
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        department = self.request.query_params.get('department')
+        search = self.request.query_params.get('search')
+        
+        if department and department != 'All Courses' and department != 'All Departments':
+            queryset = queryset.filter(department__iexact=department)
+            
+        if search:
+            from django.db.models import Q
+            queryset = queryset.filter(
+                Q(course_name__icontains=search) | 
+                Q(course_code__icontains=search) |
+                Q(description__icontains=search)
+            )
+        return queryset.order_by('id')
+
 class CourseTeacherViewSet(viewsets.ModelViewSet):
-    queryset = CourseTeacher.objects.all()
+    queryset = CourseTeacher.objects.all().select_related('course', 'teacher', 'teacher__user')
     serializer_class = CourseTeacherSerializer
     permission_classes = [IsAdminTeacherOrReadOnly]
 
@@ -230,7 +247,7 @@ class CourseTeacherViewSet(viewsets.ModelViewSet):
         return queryset
 
 class CompletedCourseViewSet(viewsets.ModelViewSet):
-    queryset = CompletedCourse.objects.all()
+    queryset = CompletedCourse.objects.all().select_related('course', 'teacher', 'teacher__user')
     serializer_class = CompletedCourseSerializer
     permission_classes = [IsAdminTeacherOrReadOnly]
 
@@ -267,7 +284,7 @@ class RatingViewSet(viewsets.ModelViewSet):
         return queryset
 
 class EventViewSet(viewsets.ModelViewSet):
-    queryset = Event.objects.all().order_by('-start_date')
+    queryset = Event.objects.all().select_related('organizer', 'organizer__user').order_by('-start_date')
     serializer_class = EventSerializer
     permission_classes = [IsAdminTeacherOrReadOnly]
 

@@ -104,6 +104,7 @@ class RatingSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class EventSerializer(serializers.ModelSerializer):
+    organizer_details = TeacherBasicSerializer(source='organizer', read_only=True)
     class Meta:
         model = Event
         fields = '__all__'
