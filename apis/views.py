@@ -267,9 +267,16 @@ class ResearchInterestViewSet(viewsets.ModelViewSet):
     permission_classes = [IsTeacherOrAdmin]
 
 class CommentViewSet(viewsets.ModelViewSet):
-    queryset = Comment.objects.all()
+    queryset = Comment.objects.all().order_by('-created_at')
     serializer_class = CommentSerializer
     permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        teacher_id = self.request.query_params.get('teacher_id')
+        if teacher_id:
+            queryset = queryset.filter(teacher_id=teacher_id)
+        return queryset
 
 class RatingViewSet(viewsets.ModelViewSet):
     queryset = Rating.objects.all()
