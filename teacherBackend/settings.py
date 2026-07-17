@@ -28,7 +28,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-0boic$jnlws6^9mscutwxv9^k+#=o!+$l)cynpkcdhfjfxk+ev'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = True
 
 ALLOWED_HOSTS = ['*']
 
@@ -129,8 +129,6 @@ CHANNEL_LAYERS = {
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-import os
-
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
@@ -139,10 +137,6 @@ DATABASES = {
         'PASSWORD': os.environ.get('MYSQLPASSWORD'),
         'HOST': os.environ.get('MYSQLHOST'),
         'PORT': os.environ.get('MYSQLPORT'),
-        'OPTIONS': {
-            'ssl_disabled': False,
-        },
-        'CONN_MAX_AGE': 600,
     }
 }
 
