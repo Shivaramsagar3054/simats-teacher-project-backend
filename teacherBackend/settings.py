@@ -140,7 +140,7 @@ DATABASES = {
         'HOST': os.environ.get('MYSQLHOST'),
         'PORT': os.environ.get('MYSQLPORT'),
         'OPTIONS': {
-            'ssl': {}
+            'ssl_disabled': False,
         },
         'CONN_MAX_AGE': 600,
     }
