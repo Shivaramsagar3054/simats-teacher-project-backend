@@ -67,11 +67,71 @@ class StudentRegistrationView(APIView):
                     defaults={'otp': otp, 'password': hashed_password}
                 )
                 
+                subject = 'Verify Your Email - Teacher Performance Portal'
+                plain_message = f'Your OTP for registration is: {otp}'
+                html_message = f"""
+                <!DOCTYPE html>
+                <html>
+                <head>
+                  <meta charset="utf-8">
+                  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                  <title>OTP Verification</title>
+                </head>
+                <body style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background-color: #f4f6f9; color: #333333;">
+                  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f4f6f9; padding: 40px 0;">
+                    <tr>
+                      <td align="center">
+                        <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.08); font-size: 16px; line-height: 1.6;">
+                          
+                          <!-- Header -->
+                          <tr>
+                            <td style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); padding: 30px 40px; text-align: center; color: #ffffff;">
+                              <h1 style="margin: 0; font-size: 24px; font-weight: 700; letter-spacing: 0.5px;">Teacher Performance Portal</h1>
+                              <p style="margin: 5px 0 0 0; font-size: 14px; opacity: 0.9;">Secure Student Account Verification</p>
+                            </td>
+                          </tr>
+                          
+                          <!-- Body Content -->
+                          <tr>
+                            <td style="padding: 40px;">
+                              <h2 style="margin-top: 0; color: #1e3c72; font-size: 20px;">Email Verification Code</h2>
+                              <p style="color: #555555; margin-bottom: 25px;">
+                                Welcome to the <strong>Teacher Performance Portal</strong>. Please use the One-Time Password (OTP) below to verify your email address and complete your registration.
+                              </p>
+                              
+                              <!-- OTP Box -->
+                              <div style="background-color: #f8fafc; border: 2px dashed #cbd5e1; border-radius: 8px; padding: 25px; text-align: center; margin: 25px 0;">
+                                <span style="font-size: 36px; font-weight: 800; letter-spacing: 10px; color: #1e3c72; font-family: monospace;">{otp}</span>
+                              </div>
+                              
+                              <p style="color: #64748b; font-size: 14px; margin-top: 25px;">
+                                ⏰ <strong>Security Note:</strong> This OTP is valid for 10 minutes. If you did not request this verification code, please ignore this email.
+                              </p>
+                            </td>
+                          </tr>
+                          
+                          <!-- Footer -->
+                          <tr>
+                            <td style="background-color: #f8fafc; padding: 20px 40px; text-align: center; border-top: 1px solid #e2e8f0; font-size: 12px; color: #94a3b8;">
+                              <p style="margin: 0;">&copy; Teacher Performance Portal. All rights reserved.</p>
+                              <p style="margin: 5px 0 0 0;">This is an automated security email. Please do not reply directly to this message.</p>
+                            </td>
+                          </tr>
+
+                        </table>
+                      </td>
+                    </tr>
+                  </table>
+                </body>
+                </html>
+                """
+                
                 send_mail(
-                    'Verify your email - TeacherBackend',
-                    f'Your OTP for registration is: {otp}',
+                    subject,
+                    plain_message,
                     settings.DEFAULT_FROM_EMAIL,
                     [email],
+                    html_message=html_message,
                     fail_silently=False,
                 )
                 
