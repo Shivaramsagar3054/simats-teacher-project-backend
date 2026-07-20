@@ -81,14 +81,14 @@ class ResendHTTPEmailBackend(BaseEmailBackend):
 
 class BrevoHTTPEmailBackend(BaseEmailBackend):
     """
-    Sends emails via Brevo's (Sendinblue) HTTPS REST API.
-    Bypasses SMTP port blocks and allows sending to ANY email recipient on free tier.
+    Sends emails via Brevo's (Sendinblue) HTTPS REST API (https://api.brevo.com/v3/smtp/email).
+    This bypasses all cloud host SMTP port blocks (ports 25, 465, 587).
     """
     def send_messages(self, email_messages):
         if not email_messages:
             return 0
         
-        api_key = os.getenv('EMAIL_HOST_PASSWORD') or os.getenv('BREVO_API_KEY')
+        api_key = os.getenv('BREVO_API_KEY') or os.getenv('EMAIL_HOST_PASSWORD')
         from_email = os.getenv('DEFAULT_FROM_EMAIL', 'sagarshivaram44@gmail.com')
         
         if not api_key:
@@ -108,11 +108,9 @@ class BrevoHTTPEmailBackend(BaseEmailBackend):
                 if not html_content:
                     html_content = f"<pre>{message.body}</pre>"
 
-                to_list = [{"email": recipient} for recipient in message.to]
-
                 payload = {
-                    "sender": {"name": "Teacher Performance Portal", "email": from_email},
-                    "to": to_list,
+                    "sender": {"email": from_email},
+                    "to": [{"email": recipient} for recipient in message.to],
                     "subject": message.subject,
                     "htmlContent": html_content,
                     "textContent": message.body
@@ -130,7 +128,7 @@ class BrevoHTTPEmailBackend(BaseEmailBackend):
                 )
 
                 with urllib.request.urlopen(req, timeout=10) as response:
-                    if response.status in (200, 201):
+                    if response.status in (200, 201, 202):
                         num_sent += 1
             except urllib.error.HTTPError as http_err:
                 error_body = http_err.read().decode('utf-8', errors='ignore')
@@ -140,3 +138,4 @@ class BrevoHTTPEmailBackend(BaseEmailBackend):
                 if not self.fail_silently:
                     raise e
         return num_sent
+
