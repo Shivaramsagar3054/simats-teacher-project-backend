@@ -89,7 +89,7 @@ class BrevoHTTPEmailBackend(BaseEmailBackend):
             return 0
         
         api_key = os.getenv('BREVO_API_KEY') or os.getenv('EMAIL_HOST_PASSWORD')
-        from_email = os.getenv('DEFAULT_FROM_EMAIL', 'sagarshivaram44@gmail.com')
+        from_email = os.getenv('DEFAULT_FROM_EMAIL') or os.getenv('EMAIL_HOST_USER') or 'sagarshivaram44@gmail.com'
         
         if not api_key:
             if not self.fail_silently:

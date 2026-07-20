@@ -204,14 +204,17 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 AUTH_USER_MODEL = 'apis.User'
 
 # Email Settings for real email sending
-_raw_backend = os.getenv('EMAIL_BACKEND', 'apis.email_backend.BrevoHTTPEmailBackend')
-if os.getenv('BREVO_API_KEY') or os.getenv('EMAIL_HOST_PASSWORD', '').startswith('xkeysib-'):
-    EMAIL_BACKEND = 'apis.email_backend.BrevoHTTPEmailBackend'
-else:
-    EMAIL_BACKEND = _raw_backend
-
+_raw_backend = os.getenv('EMAIL_BACKEND', '')
 EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
 EMAIL_PORT = int(os.getenv('EMAIL_PORT', 587))
+
+if 'brevo' in _raw_backend.lower() or 'brevo' in EMAIL_HOST.lower() or os.getenv('BREVO_API_KEY') or os.getenv('EMAIL_HOST_PASSWORD', '').startswith(('xkeysib-', 'xsmtp-')):
+    EMAIL_BACKEND = 'apis.email_backend.BrevoHTTPEmailBackend'
+elif _raw_backend:
+    EMAIL_BACKEND = _raw_backend
+else:
+    EMAIL_BACKEND = 'apis.email_backend.BrevoHTTPEmailBackend'
+
 
 _use_tls_env = os.getenv('EMAIL_USE_TLS')
 _use_ssl_env = os.getenv('EMAIL_USE_SSL')
