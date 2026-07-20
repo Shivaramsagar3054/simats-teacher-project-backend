@@ -204,7 +204,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 AUTH_USER_MODEL = 'apis.User'
 
 # Email Settings for real email sending
-EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'apis.email_backend.CustomSSLEmailBackend')
+EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'apis.email_backend.ResendHTTPEmailBackend')
 EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
 EMAIL_PORT = int(os.getenv('EMAIL_PORT', 587))
 
