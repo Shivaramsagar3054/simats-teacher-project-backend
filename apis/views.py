@@ -126,14 +126,27 @@ class StudentRegistrationView(APIView):
                 </html>
                 """
                 
-                send_mail(
-                    subject,
-                    plain_message,
-                    settings.DEFAULT_FROM_EMAIL,
-                    [email],
-                    html_message=html_message,
-                    fail_silently=False,
-                )
+                try:
+                    from django.core.mail import get_connection, EmailMultiAlternatives
+                    connection = get_connection(
+                        backend=settings.EMAIL_BACKEND,
+                        fail_silently=False,
+                        timeout=getattr(settings, 'EMAIL_TIMEOUT', 5)
+                    )
+                    mail_msg = EmailMultiAlternatives(
+                        subject,
+                        plain_message,
+                        settings.DEFAULT_FROM_EMAIL,
+                        [email],
+                        connection=connection
+                    )
+                    mail_msg.attach_alternative(html_message, "text/html")
+                    mail_msg.send()
+                except Exception as mail_err:
+                    return Response({
+                        'error': 'Failed to send verification email. Please check SMTP configuration on the server.',
+                        'details': str(mail_err)
+                    }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
                 
                 return Response({
                     'message': 'OTP sent to your email. Please verify to complete registration.'

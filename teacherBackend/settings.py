@@ -203,14 +203,26 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 AUTH_USER_MODEL = 'apis.User'
 
-# Email Settings for real email sending (Gmail example)
+# Email Settings for real email sending
 EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'apis.email_backend.CustomSSLEmailBackend')
-EMAIL_HOST = 'smtp.gmail.com'
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'sagarshivaram44@gmail.com'  # REPLACE THIS
-EMAIL_HOST_PASSWORD = 'cpilgdcnoyhjkqeg' # REPLACE THIS
-DEFAULT_FROM_EMAIL = 'sagarshivaram44@gmail.com'
+EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
+EMAIL_PORT = int(os.getenv('EMAIL_PORT', 587))
+
+_use_tls_env = os.getenv('EMAIL_USE_TLS')
+_use_ssl_env = os.getenv('EMAIL_USE_SSL')
+if _use_tls_env is not None or _use_ssl_env is not None:
+    EMAIL_USE_TLS = (_use_tls_env or 'False').lower() in ('true', '1', 'yes')
+    EMAIL_USE_SSL = (_use_ssl_env or 'False').lower() in ('true', '1', 'yes')
+else:
+    EMAIL_USE_SSL = (EMAIL_PORT == 465)
+    EMAIL_USE_TLS = (EMAIL_PORT == 587)
+
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', 'sagarshivaram44@gmail.com')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', 'cpilgdcnoyhjkqeg')
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER)
+EMAIL_TIMEOUT = int(os.getenv('EMAIL_TIMEOUT', 5))
+
+
 
 
 # CORS Settings
