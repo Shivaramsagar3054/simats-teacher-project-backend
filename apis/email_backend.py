@@ -78,3 +78,65 @@ class ResendHTTPEmailBackend(BaseEmailBackend):
                 if not self.fail_silently:
                     raise e
         return num_sent
+
+class BrevoHTTPEmailBackend(BaseEmailBackend):
+    """
+    Sends emails via Brevo's (Sendinblue) HTTPS REST API.
+    Bypasses SMTP port blocks and allows sending to ANY email recipient on free tier.
+    """
+    def send_messages(self, email_messages):
+        if not email_messages:
+            return 0
+        
+        api_key = os.getenv('EMAIL_HOST_PASSWORD') or os.getenv('BREVO_API_KEY')
+        from_email = os.getenv('DEFAULT_FROM_EMAIL', 'sagarshivaram44@gmail.com')
+        
+        if not api_key:
+            if not self.fail_silently:
+                raise ValueError("BREVO_API_KEY or EMAIL_HOST_PASSWORD environment variable is missing.")
+            return 0
+
+        num_sent = 0
+        for message in email_messages:
+            try:
+                html_content = ""
+                if hasattr(message, 'alternatives'):
+                    for content, mimetype in message.alternatives:
+                        if mimetype == 'text/html':
+                            html_content = content
+                            break
+                if not html_content:
+                    html_content = f"<pre>{message.body}</pre>"
+
+                to_list = [{"email": recipient} for recipient in message.to]
+
+                payload = {
+                    "sender": {"name": "Teacher Performance Portal", "email": from_email},
+                    "to": to_list,
+                    "subject": message.subject,
+                    "htmlContent": html_content,
+                    "textContent": message.body
+                }
+
+                req = urllib.request.Request(
+                    "https://api.brevo.com/v3/smtp/email",
+                    data=json.dumps(payload).encode('utf-8'),
+                    headers={
+                        "api-key": api_key.strip(),
+                        "Content-Type": "application/json",
+                        "Accept": "application/json"
+                    },
+                    method="POST"
+                )
+
+                with urllib.request.urlopen(req, timeout=10) as response:
+                    if response.status in (200, 201):
+                        num_sent += 1
+            except urllib.error.HTTPError as http_err:
+                error_body = http_err.read().decode('utf-8', errors='ignore')
+                if not self.fail_silently:
+                    raise RuntimeError(f"Brevo HTTP API error {http_err.code}: {error_body}")
+            except Exception as e:
+                if not self.fail_silently:
+                    raise e
+        return num_sent
