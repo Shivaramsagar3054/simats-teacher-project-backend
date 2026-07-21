@@ -373,7 +373,28 @@ class EventViewSet(viewsets.ModelViewSet):
         print("====== INCOMING EVENT POST DATA ======")
         print(request.data)
         print("=======================================")
-        return super().create(request, *args, **kwargs)
+        serializer = self.get_serializer(data=request.data)
+        if not serializer.is_valid():
+            print("====== EVENT VALIDATION ERRORS ======")
+            print(serializer.errors)
+            print("=====================================")
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+
+    def perform_create(self, serializer):
+        organizer = serializer.validated_data.get('organizer')
+        if not organizer and hasattr(self.request.user, 'teacher_profile'):
+            serializer.save(organizer=self.request.user.teacher_profile)
+        elif not organizer:
+            teacher = Teacher.objects.filter(user=self.request.user).first()
+            if teacher:
+                serializer.save(organizer=teacher)
+            else:
+                serializer.save()
+        else:
+            serializer.save()
 
     def get_queryset(self):
         # Automatically delete events whose end_date was more than 3 days ago
