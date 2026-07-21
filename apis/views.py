@@ -376,6 +376,12 @@ class EventViewSet(viewsets.ModelViewSet):
         return super().create(request, *args, **kwargs)
 
     def get_queryset(self):
+        # Automatically delete events whose end_date was more than 3 days ago
+        from django.utils import timezone
+        from datetime import timedelta
+        cutoff = timezone.now() - timedelta(days=3)
+        Event.objects.filter(end_date__lt=cutoff).delete()
+
         queryset = super().get_queryset()
         search = self.request.query_params.get('search')
         organizer_id = self.request.query_params.get('organizer_id')
