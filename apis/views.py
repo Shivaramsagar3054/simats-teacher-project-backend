@@ -246,6 +246,18 @@ class UserProfileView(generics.RetrieveUpdateAPIView):
     def get_object(self):
         return self.request.user
 
+    def get(self, request, *args, **kwargs):
+        user = self.get_object()
+        serializer = self.get_serializer(user)
+        data = serializer.data
+        if user.role == 'teacher':
+            try:
+                teacher = user.teacher_profile
+                data['teacher_profile'] = TeacherSerializer(teacher).data
+            except Exception:
+                data['teacher_profile'] = None
+        return Response(data)
+
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
@@ -260,7 +272,11 @@ class TeacherViewSet(viewsets.ModelViewSet):
         queryset = super().get_queryset()
         department = self.request.query_params.get('department')
         search = self.request.query_params.get('search')
+        user_id = self.request.query_params.get('user_id') or self.request.query_params.get('user')
         
+        if user_id:
+            queryset = queryset.filter(user_id=user_id)
+            
         if department and department != 'All Professors':
             queryset = queryset.filter(department=department)
         
